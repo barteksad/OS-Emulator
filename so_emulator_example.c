@@ -47,6 +47,7 @@ static void dump_memory(uint8_t const *memory) {
 
 // Sprawdza proste przypisania bez skoków.
 static const uint16_t code_mov[MEM_SIZE] = {
+  0x0000 + 0x100 * 4 + 0x0800 * 0,  // MOV  [X], A
   0x4000 + 0x100 * 0 + 1,           // MOVI A, 1
   0x4000 + 0x100 * 1 + 3,           // MOVI D, 3
   0x4000 + 0x100 * 2 + 0x11,        // MOVI X, 0x11
