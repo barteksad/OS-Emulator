@@ -135,6 +135,7 @@ decode_arg2:
 
     .decoded_arg2:
 
+    xor     r9, r9  ; DEBUG 
     mov     r9b, al ; we only care about r9b value
     ret
 
@@ -240,7 +241,7 @@ so_emul:
         ; this can be done by shifting right 12 bits and checking if it is equal to 1100 (C??? - hex before shift) 
         mov     ax, [r11]                
         shr     ax, 12
-        cmp    ax, [rel DETECT_JUMP]
+        cmp     ax, [rel DETECT_JUMP]
         je     .switch_imm8        ; jump if equal
 
         ; detect no args operation
@@ -322,9 +323,9 @@ so_emul:
                 xor     al, al    
                 cmp     al, [rel C_FLAG]        ; set CF flag to what is in C_FLAG
                 adc     r8b, r9b
-                sahf                            ; because setting modifies flags
+                lahf                            ; because setting modifies flags
                 call    set_c_flag
-                lahf
+                sahf
                 call    set_z_flag
                 call    encode_arg1   
                 jmp     .switch_end
@@ -334,9 +335,9 @@ so_emul:
                 xor     al, al    
                 cmp     al, [rel C_FLAG]        ; set CF flag to what is in C_FLAG
                 sbb     r8b, r9b
-                sahf                            ; because setting modifies flags
+                lahf                            ; because setting modifies flags
                 call    set_c_flag
-                lahf
+                sahf
                 call    set_z_flag
                 call    encode_arg1
                 jmp     .switch_end
@@ -407,9 +408,9 @@ so_emul:
             .cmpi_arg1_imm8:
 
                 sub     r8b, r9b
-                sahf
-                call    set_c_flag
                 lahf
+                call    set_c_flag
+                sahf
                 call    set_z_flag
                 jmp     .switch_end
 
@@ -417,12 +418,12 @@ so_emul:
 
                 push    rcx
                 mov     cl, r9b
+                mov     al, 0
+                cmp     al, byte [rel C_FLAG]   ; set CF flag as C_FLAG
                 rcr     r8b, cl
                 pop     rcx
-                sahf
                 call    set_c_flag
-                lahf
-                call    set_z_flag
+                call    encode_arg1
                 jmp     .switch_end
 
             .andi_arg1_imm8:
@@ -460,7 +461,6 @@ so_emul:
 
                 stc
                 call    set_c_flag
-                jmp     set_c_flag
                 jmp     .switch_end
 
             .brk_no_param:
@@ -474,7 +474,7 @@ so_emul:
             call decode_imm8
 
             mov     ax, [r11] 
-            and     ax, 0xF000 ; we only care about 4-th byte
+            and     ax, 0xFF00 ; we only care about 3-th and 4-th byte
 
             cmp     ax, 0xC000 
             je      .jmp_imm8
@@ -496,10 +496,12 @@ so_emul:
 
             .jmp_imm8:
 
-                xor     rax, rax
+                ; xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
             .jnc_imm8:
@@ -508,10 +510,12 @@ so_emul:
                 cmp     al, 1
                 je      .switch_end
 
-                xor     rax, rax
+                ; xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
             .jc_imm8:
@@ -522,8 +526,10 @@ so_emul:
 
                 xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
             .jnz_imm8:
@@ -534,8 +540,10 @@ so_emul:
 
                 xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
             .jz_imm8:
@@ -546,8 +554,10 @@ so_emul:
 
                 xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
             .djnz_imm8:
@@ -559,16 +569,18 @@ so_emul:
                 sub     byte [rel D_REG], 1
                 xor     rax, rax
                 mov     al, r9b
+                add     [rel PC_REG], al
+                movsx   rax, r9b
                 imul    rax, 2
-                sub     r11, rax
+                add     r11, rax
                 jmp     .switch_end
 
         .switch_end:
 
-        inc     byte [rel PC_REG]   ; increment total steps count
-        dec     rdx                 ; decrement steps to execute count
-        add     r11, 2              ; increment code pointer by two because it points to int16
-        jmp     .emul_step          ; jump to next step loop
+        add     byte [rel PC_REG], 1    ; increment total steps count
+        dec     rdx                     ; decrement steps to execute count
+        add     r11, 2                  ; increment code pointer by two because it points to int16
+        jmp     .emul_step              ; jump to next step loop
 
     .steps_end:
 
