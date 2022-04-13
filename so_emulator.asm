@@ -29,6 +29,9 @@ section .bss
     Z_FLAG:     resb    1
     CODE_PTR:   resq    1
 
+    alignb 4
+    spin_lock:   resd 1
+
 section .text
 
 decode_arg1:
@@ -200,6 +203,61 @@ encode_arg1:
     pop     r9      ; restore r9
     ret
 
+encode_arg2:
+
+    ; encodes value of arg2 from r9b to where it should go
+    ; works similar as decode_arg1 but in reversed direction
+    mov     rax, [r11]
+    shr     rax, 11
+    and     al, 0x7
+
+    push    r8 ; save and use r8 here
+    xor     r8, r8
+
+    lea     r10, [rel A_REG]
+    cmp     al, byte [rel A_REG_CODE]
+    je      .encoded_arg2_address
+
+    lea     r10, [rel D_REG]
+    cmp     al, byte [rel D_REG_CODE]
+    je      .encoded_arg2_address
+
+    lea     r10, [rel X_REG]
+    cmp     al, byte [rel X_REG_CODE]
+    je      .encoded_arg2_address
+
+    lea     r10, [rel Y_REG]
+    cmp     al, byte [rel Y_REG_CODE]
+    je      .encoded_arg2_address
+
+    mov     r8b,  byte [rel X_REG]
+    lea     r10, [rsi + r8]
+    cmp     al, byte [rel X_MEM_CODE]
+    je      .encoded_arg2_address
+
+    mov     r8b,  byte [rel Y_REG]
+    lea     r10, [rsi + r8]
+    cmp     al, byte [rel Y_MEM_CODE]
+    je      .encoded_arg2_address
+
+    mov     r8b,  byte [rel X_REG]
+    add     r8b,  byte [rel D_REG]
+    lea     r10, [rsi + r8]
+    cmp     al, byte [rel XpD_MEM_CODE]
+    je      .encoded_arg2_address
+
+    mov     r8b,  byte [rel Y_REG]
+    add     r8b,  byte [rel D_REG]
+    lea     r10, [rsi + r8]
+    cmp     al, byte [rel YpD_MEM_CODE]
+    je      .encoded_arg2_address
+
+    .encoded_arg2_address:
+
+    mov     [r10], r9b
+    pop     r8      ; restore r8
+    ret
+
 set_c_flag:
     mov     byte [rel C_FLAG], 0
     jnc     .do_not_set_c_to_one
@@ -226,9 +284,14 @@ so_emul:
     ; if not, it must be first function call, so we take code pointer from rdi
     ; at the end of function, we save rdi (code pointer) to CODE_PTR
     ; we use r11 as current code pointer register
-    mov     r11, qword [rel CODE_PTR]
-    cmp     r11, 0
-    cmovz   r11, rdi
+    ; mov     r11, qword [rel CODE_PTR]
+    ; cmp     r11, 0
+    ; cmovz   r11, rdi
+    xor r11, r11
+    add r11w, [rel PC_REG]
+    imul r11w, 2
+    add r11, rdi
+    ; mov r11, rdi
 
     .emul_step:
 
@@ -260,6 +323,10 @@ so_emul:
         jmp     .switch_arg1_arg2 
 
         .switch_arg1_arg2:
+
+            ; might be atomic
+            cmp     byte [r11], 0x0008
+            je      .xchg_arg1_arg2
             
             call    decode_arg1     ; stores it in r8b
             call    decode_arg2     ; stores it in r9b
@@ -290,6 +357,26 @@ so_emul:
 
             cmp     byte [r11], 0x0003
             je      .xor_arg1_arg2
+
+            .xchg_arg1_arg2:
+
+                mov     eax, 1
+                .busy_wait:
+                    lock xchg    [rel spin_lock], eax
+                    test    eax, eax
+                    jnz     .busy_wait
+
+                call    decode_arg1     ; stores it in r8b
+                call    decode_arg2
+
+                xchg    r8b, r9b
+                call    encode_arg1
+                call    encode_arg2
+
+                mov     eax, 0
+                mov     [rel spin_lock], eax
+
+                jmp     .switch_end
 
             .mov_arg1_arg2:
 
@@ -443,13 +530,13 @@ so_emul:
         .switch_no_param:
 
             cmp     word [r11], 0x8000
-            jmp     .clc_no_param
+            je     .clc_no_param
 
             cmp     word [r11], 0x8100
-            jmp     .stc_no_param
+            je     .stc_no_param
 
             cmp     word [r11], 0xFFFF
-            jmp     .brk_no_param
+            je     .brk_no_param
 
             .clc_no_param:
 
