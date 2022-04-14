@@ -2,6 +2,9 @@ global so_emul
 
 section .data
 
+    align 4
+    spin_lock dd 0
+
     align 8
     DETECT_JUMP:     dw 0xC
     DETECT_NO_ARGS:  dw 0x8000
@@ -15,22 +18,25 @@ section .data
     Y_MEM_CODE:      db  5
     XpD_MEM_CODE:    db  6
     YpD_MEM_CODE:    db  7
+    PC_REG_CODE:     db  4
+    C_FLAG_CODE:     db  6
+    Z_FLAG_CODE:     db  7
 
 section .bss
 
-    align 8
-    A_REG:      resb    1
-    D_REG:      resb    1
-    X_REG:      resb    1
-    Y_REG:      resb    1
-    PC_REG:     resb    1
-    unused:     resb    1
-    C_FLAG:     resb    1
-    Z_FLAG:     resb    1
-    CODE_PTR:   resq    1
 
-    alignb 4
-    spin_lock:   resd 1
+    align 8
+    REGS:       resq CORES
+
+    ; A_REG:      resb    1
+    ; D_REG:      resb    1
+    ; X_REG:      resb    1
+    ; Y_REG:      resb    1
+    ; PC_REG:     resb    1
+    ; unused:     resb    1
+    ; C_FLAG:     resb    1
+    ; Z_FLAG:     resb    1
+
 
 section .text
 
@@ -44,40 +50,40 @@ decode_arg1:
     ; use rax for temporary lea source
     xor     rax, rax
 
-    mov     al,  byte [rel A_REG]
+    mov     al,  byte [r12 + 8 * rcx + 0]
     cmp     r8b, byte [rel A_REG_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 1]
     cmp     r8b, byte [rel D_REG_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel X_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
     cmp     r8b, byte [rel X_REG_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel Y_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
     cmp     r8b, byte [rel Y_REG_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel X_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
     mov     al,  byte [rsi + rax]
     cmp     r8b, byte [rel X_MEM_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel Y_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
     mov     al,  byte [rsi + rax]
     cmp     r8b, byte [rel Y_MEM_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel X_REG]
-    add     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
+    add     al,  byte [r12 + 8 * rcx + 1]
     mov     al,  byte [rsi + rax]
     cmp     r8b, byte [rel XpD_MEM_CODE]
     je      .decoded_arg1
 
-    mov     al,  byte [rel Y_REG]
-    add     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
+    add     al,  byte [r12 + 8 * rcx + 1]
     mov     al,  byte [rsi + rax]
     cmp     r8b, byte [rel YpD_MEM_CODE]
     je      .decoded_arg1
@@ -98,40 +104,40 @@ decode_arg2:
     ; use rax for temporary lea source
     xor     rax, rax
 
-    mov     al,  byte [rel A_REG]
+    mov     al,  byte [r12 + 8 * rcx + 0]
     cmp     r9b, byte [rel A_REG_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 1]
     cmp     r9b, byte [rel D_REG_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel X_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
     cmp     r9b, byte [rel X_REG_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel Y_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
     cmp     r9b, byte [rel Y_REG_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel X_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
     mov     al,  byte [rsi + rax]
     cmp     r9b, byte [rel X_MEM_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel Y_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
     mov     al,  byte [rsi + rax]
     cmp     r9b, byte [rel Y_MEM_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel X_REG]
-    add     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 2]
+    add     al,  byte [r12 + 8 * rcx + 1]
     mov     al,  byte [rsi + rax]
     cmp     r9b, byte [rel XpD_MEM_CODE]
     je      .decoded_arg2
 
-    mov     al,  byte [rel Y_REG]
-    add     al,  byte [rel D_REG]
+    mov     al,  byte [r12 + 8 * rcx + 3]
+    add     al,  byte [r12 + 8 * rcx + 1]
     mov     al,  byte [rsi + rax]
     cmp     r9b, byte [rel YpD_MEM_CODE]
     je      .decoded_arg2
@@ -159,40 +165,40 @@ encode_arg1:
     push    r9 ; save and use r9 here
     xor     r9, r9
 
-    lea     r10, [rel A_REG]
+    lea     r10, [r12 + 8 * rcx + 0]
     cmp     al, byte [rel A_REG_CODE]
     je      .encoded_arg1_address
 
-    lea     r10, [rel D_REG]
+    lea     r10, [r12 + 8 * rcx + 1]
     cmp     al, byte [rel D_REG_CODE]
     je      .encoded_arg1_address
 
-    lea     r10, [rel X_REG]
+    lea     r10, [r12 + 8 * rcx + 2]
     cmp     al, byte [rel X_REG_CODE]
     je      .encoded_arg1_address
 
-    lea     r10, [rel Y_REG]
+    lea     r10, [r12 + 8 * rcx + 3]
     cmp     al, byte [rel Y_REG_CODE]
     je      .encoded_arg1_address
 
-    mov     r9b,  byte [rel X_REG]
+    mov     r9b,  byte [r12 + 8 * rcx + 2]
     lea     r10, [rsi + r9]
     cmp     al, byte [rel X_MEM_CODE]
     je      .encoded_arg1_address
 
-    mov     r9b,  byte [rel Y_REG]
+    mov     r9b,  byte [r12 + 8 * rcx + 3]
     lea     r10, [rsi + r9]
     cmp     al, byte [rel Y_MEM_CODE]
     je      .encoded_arg1_address
 
-    mov     r9b,  byte [rel X_REG]
-    add     r9b,  byte [rel D_REG]
+    mov     r9b,  byte [r12 + 8 * rcx + 2]
+    add     r9b,  byte [r12 + 8 * rcx + 1]
     lea     r10, [rsi + r9]
     cmp     al, byte [rel XpD_MEM_CODE]
     je      .encoded_arg1_address
 
-    mov     r9b,  byte [rel Y_REG]
-    add     r9b,  byte [rel D_REG]
+    mov     r9b,  byte [r12 + 8 * rcx + 3]
+    add     r9b,  byte [r12 + 8 * rcx + 1]
     lea     r10, [rsi + r9]
     cmp     al, byte [rel YpD_MEM_CODE]
     je      .encoded_arg1_address
@@ -214,40 +220,40 @@ encode_arg2:
     push    r8 ; save and use r8 here
     xor     r8, r8
 
-    lea     r10, [rel A_REG]
+    lea     r10, [r12 + 8 * rcx + 0]
     cmp     al, byte [rel A_REG_CODE]
     je      .encoded_arg2_address
 
-    lea     r10, [rel D_REG]
+    lea     r10, [r12 + 8 * rcx + 1]
     cmp     al, byte [rel D_REG_CODE]
     je      .encoded_arg2_address
 
-    lea     r10, [rel X_REG]
+    lea     r10, [r12 + 8 * rcx + 2]
     cmp     al, byte [rel X_REG_CODE]
     je      .encoded_arg2_address
 
-    lea     r10, [rel Y_REG]
+    lea     r10, [r12 + 8 * rcx + 3]
     cmp     al, byte [rel Y_REG_CODE]
     je      .encoded_arg2_address
 
-    mov     r8b,  byte [rel X_REG]
+    mov     r8b,  byte [r12 + 8 * rcx + 2]
     lea     r10, [rsi + r8]
     cmp     al, byte [rel X_MEM_CODE]
     je      .encoded_arg2_address
 
-    mov     r8b,  byte [rel Y_REG]
+    mov     r8b,  byte [r12 + 8 * rcx + 3]
     lea     r10, [rsi + r8]
     cmp     al, byte [rel Y_MEM_CODE]
     je      .encoded_arg2_address
 
-    mov     r8b,  byte [rel X_REG]
-    add     r8b,  byte [rel D_REG]
+    mov     r8b,  byte [r12 + 8 * rcx + 2]
+    add     r8b,  byte [r12 + 8 * rcx + 1]
     lea     r10, [rsi + r8]
     cmp     al, byte [rel XpD_MEM_CODE]
     je      .encoded_arg2_address
 
-    mov     r8b,  byte [rel Y_REG]
-    add     r8b,  byte [rel D_REG]
+    mov     r8b,  byte [r12 + 8 * rcx + 3]
+    add     r8b,  byte [r12 + 8 * rcx + 1]
     lea     r10, [rsi + r8]
     cmp     al, byte [rel YpD_MEM_CODE]
     je      .encoded_arg2_address
@@ -259,44 +265,50 @@ encode_arg2:
     ret
 
 set_c_flag:
-    mov     byte [rel C_FLAG], 0
+    mov     byte [r12 + 8 * rcx + 6], 0
     jnc     .do_not_set_c_to_one
-    mov     byte [rel C_FLAG], 1 ; equal
+    mov     byte [r12 + 8 * rcx + 6], 1 ; equal
     .do_not_set_c_to_one:
     ret
 
 set_z_flag:
-    mov     byte [rel Z_FLAG], 0
+    mov     byte [r12 + 8 * rcx + 7], 0
     jnz     .do_not_set_z_to_one
-    mov     byte [rel Z_FLAG], 1
+    mov     byte [r12 + 8 * rcx + 7], 1
     .do_not_set_z_to_one:
     ret
 
+
+align 8
 so_emul:
 
     ; uint16_t const *code, uint8_t *data, size_t steps, size_t core
-    ; rdi - code pointer, rsi - data pointer, rdx - steps, rcx - cores
+    ; rdi - code pointer, rsi - data pointer, rdx - steps, rcx - REGS
 
+    push    r12
     push    rbp    
     mov     rbp, rsp
 
-    ; if CODE_PTR is not 0, we load code pointer from it, because it it shared across function executions
-    ; if not, it must be first function call, so we take code pointer from rdi
-    ; at the end of function, we save rdi (code pointer) to CODE_PTR
-    ; we use r11 as current code pointer register
-    ; mov     r11, qword [rel CODE_PTR]
-    ; cmp     r11, 0
-    ; cmovz   r11, rdi
+    lea     r12, [rel REGS]
+
+
     xor r11, r11
-    add r11w, [rel PC_REG]
+    add r11b, byte [r12 + 8 * rcx + 4]
     imul r11w, 2
     add r11, rdi
-    ; mov r11, rdi
 
     .emul_step:
 
         test    rdx, rdx    ; check if number of steps to perform is greater than zero
         jz      .steps_end 
+
+        lea     r8, [rel spin_lock]
+        mov     r9d, 1
+        .busy_wait:
+            xor     eax, eax
+            lock \
+            cmpxchg [r8], r9d
+            jne     .busy_wait
 
         ; we have actions taking different types of argument and we have to detect them    
 
@@ -327,6 +339,10 @@ so_emul:
             ; might be atomic
             cmp     byte [r11], 0x0008
             je      .xchg_arg1_arg2
+
+            xor     eax, eax
+            lea     r8, [rel spin_lock]
+            mov     [r8], eax
             
             call    decode_arg1     ; stores it in r8b
             call    decode_arg2     ; stores it in r9b
@@ -360,21 +376,24 @@ so_emul:
 
             .xchg_arg1_arg2:
 
-                mov     eax, 1
-                .busy_wait:
-                    lock xchg    [rel spin_lock], eax
-                    test    eax, eax
-                    jnz     .busy_wait
+                ; lea     r8, [rel spin_lock]
+                ; mov     r9d, 1
+                ; .busy_wait:
+                ;     xor     eax, eax
+                ;     lock \
+                ;     cmpxchg [r8], r9d
+                ;     jne     .busy_wait
 
                 call    decode_arg1     ; stores it in r8b
-                call    decode_arg2
+                call    decode_arg2     ; stores it in r9b
 
                 xchg    r8b, r9b
                 call    encode_arg1
                 call    encode_arg2
 
-                mov     eax, 0
-                mov     [rel spin_lock], eax
+                xor     eax, eax
+                lea     r8, [rel spin_lock]
+                mov     [r8], eax
 
                 jmp     .switch_end
 
@@ -407,8 +426,9 @@ so_emul:
 
             .adc_arg1_arg2:
 
-                xor     al, al    
-                cmp     al, [rel C_FLAG]        ; set CF flag to what is in C_FLAG
+                xor     al, al
+                mov     r10b,  byte [r12 + 8 * rcx + 6]
+                cmp     al, r10b  ; set CF flag as C_FLAG
                 adc     r8b, r9b
                 lahf                            ; because setting modifies flags
                 call    set_c_flag
@@ -419,8 +439,9 @@ so_emul:
 
             .sbb_arg1_arg2:
 
-                xor     al, al    
-                cmp     al, [rel C_FLAG]        ; set CF flag to what is in C_FLAG
+                xor     al, al
+                mov     r10b,  byte [r12 + 8 * rcx + 6]
+                cmp     al, r10b  ; set CF flag as C_FLAG
                 sbb     r8b, r9b
                 lahf                            ; because setting modifies flags
                 call    set_c_flag
@@ -444,6 +465,10 @@ so_emul:
                 jmp     .switch_end
 
         .switch_arg_imm8:
+
+            xor     eax, eax
+            lea     r8, [rel spin_lock]
+            mov     [r8], eax
 
             call    decode_arg1     ; stores it in r8b
             call    decode_imm8     ; stores it in r9b
@@ -504,9 +529,10 @@ so_emul:
             .rcr_arg1_imm8:
 
                 push    rcx
+                xor     al, al
+                mov     r10b,  byte [r12 + 8 * rcx + 6]
+                cmp     al, r10b  ; set CF flag as C_FLAG
                 mov     cl, r9b
-                mov     al, 0
-                cmp     al, byte [rel C_FLAG]   ; set CF flag as C_FLAG
                 rcr     r8b, cl
                 pop     rcx
                 call    set_c_flag
@@ -528,6 +554,10 @@ so_emul:
                 jmp     .switch_end
 
         .switch_no_param:
+
+            xor     eax, eax
+            lea     r8, [rel spin_lock]
+            mov     [r8], eax
 
             cmp     word [r11], 0x8000
             je     .clc_no_param
@@ -558,6 +588,10 @@ so_emul:
 
         .switch_imm8:
 
+            xor     eax, eax
+            lea     r8, [rel spin_lock]
+            mov     [r8], eax
+
             call decode_imm8
 
             mov     ax, [r11] 
@@ -585,7 +619,7 @@ so_emul:
 
                 ; xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -593,13 +627,13 @@ so_emul:
 
             .jnc_imm8:
                 
-                mov     al, [rel C_FLAG]
+                mov     al, [r12 + 8 * rcx + 6]
                 cmp     al, 1
                 je      .switch_end
 
                 ; xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -607,13 +641,13 @@ so_emul:
 
             .jc_imm8:
 
-                mov     al, [rel C_FLAG]
+                mov     al, [r12 + 8 * rcx + 6]
                 cmp     al, 0
                 je      .switch_end
 
                 xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -621,13 +655,13 @@ so_emul:
 
             .jnz_imm8:
 
-                mov     al, [rel Z_FLAG]
+                mov     al, [r12 + 8 * rcx + 7]
                 cmp     al, 1
                 je      .switch_end
 
                 xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -635,13 +669,13 @@ so_emul:
 
             .jz_imm8:
 
-                mov     al, [rel Z_FLAG]
+                mov     al, [r12 + 8 * rcx + 7]
                 cmp     al, 0
                 je      .switch_end
 
                 xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -649,14 +683,14 @@ so_emul:
 
             .djnz_imm8:
 
-                mov     al, [rel D_REG]
+                mov     al, [r12 + 8 * rcx + 1]
                 cmp     al, 0
                 je      .switch_end
 
-                sub     byte [rel D_REG], 1
+                sub     byte [r12 + 8 * rcx + 1], 1
                 xor     rax, rax
                 mov     al, r9b
-                add     [rel PC_REG], al
+                add     [r12 + 8 * rcx + 4], al
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
@@ -664,16 +698,15 @@ so_emul:
 
         .switch_end:
 
-        add     byte [rel PC_REG], 1    ; increment total steps count
+        add     byte [r12 + 8 * rcx + 4], 1    ; increment total steps count
         dec     rdx                     ; decrement steps to execute count
         add     r11, 2                  ; increment code pointer by two because it points to int16
         jmp     .emul_step              ; jump to next step loop
 
     .steps_end:
 
-    ; save code pointer
-    mov     [rel CODE_PTR], r11
 
     leave
-    mov     rax, qword [rel A_REG]  ; saves so cpu state 
+    mov     rax, qword [r12 + 8 * rcx]  ; saves so cpu state 
+    pop     r12
     ret
