@@ -209,10 +209,10 @@ encode_arg1:
     pop     r9      ; restore r9
     ret
 
-encode_arg2:
+encode_arg2_address:
 
-    ; encodes value of arg2 from r9b to where it should go
-    ; works similar as decode_arg1 but in reversed direction
+    ; encodes address of arg2 from r11 to r10
+    ; only used in xchg
     mov     rax, [r11]
     shr     rax, 11
     and     al, 0x7
@@ -260,7 +260,6 @@ encode_arg2:
 
     .encoded_arg2_address:
 
-    mov     [r10], r9b
     pop     r8      ; restore r8
     ret
 
@@ -299,16 +298,16 @@ so_emul:
 
     .emul_step:
 
+    lea     r8, [rel spin_lock]
+                mov     r9d, 1
+                .busy_wait:
+                    xor     eax, eax
+                    lock \
+                    cmpxchg [r8], r9d
+                    jne     .busy_wait
+
         test    rdx, rdx    ; check if number of steps to perform is greater than zero
         jz      .steps_end 
-
-        lea     r8, [rel spin_lock]
-        mov     r9d, 1
-        .busy_wait:
-            xor     eax, eax
-            lock \
-            cmpxchg [r8], r9d
-            jne     .busy_wait
 
         ; we have actions taking different types of argument and we have to detect them    
 
@@ -339,10 +338,6 @@ so_emul:
             ; might be atomic
             cmp     byte [r11], 0x0008
             je      .xchg_arg1_arg2
-
-            xor     eax, eax
-            lea     r8, [rel spin_lock]
-            mov     [r8], eax
             
             call    decode_arg1     ; stores it in r8b
             call    decode_arg2     ; stores it in r9b
@@ -368,11 +363,11 @@ so_emul:
 
             ; -- not documented instructions --
 
-            cmp     byte [r11], 0x0001
-            je      .and_arg1_arg2
+            ; cmp     byte [r11], 0x0001
+            ; je      .and_arg1_arg2
 
-            cmp     byte [r11], 0x0003
-            je      .xor_arg1_arg2
+            ; cmp     byte [r11], 0x0003
+            ; je      .xor_arg1_arg2
 
             .xchg_arg1_arg2:
 
@@ -388,12 +383,15 @@ so_emul:
                 call    decode_arg2     ; stores it in r9b
 
                 xchg    r8b, r9b
+                call    encode_arg2_address
+                push    r10
                 call    encode_arg1
-                call    encode_arg2
+                pop     r10
+                mov     [r10], r9b
 
-                xor     eax, eax
-                lea     r8, [rel spin_lock]
-                mov     [r8], eax
+                ; xor     eax, eax
+                ; lea     r8, [rel spin_lock]
+                ; mov     [r8], eax
 
                 jmp     .switch_end
 
@@ -450,26 +448,23 @@ so_emul:
                 call    encode_arg1
                 jmp     .switch_end
 
-            .and_arg1_arg2:
+            ; .and_arg1_arg2:
 
-                and     r8b, r9b
-                call    set_z_flag
-                call    encode_arg1
-                jmp     .switch_end
+            ;     and     r8b, r9b
+            ;     call    set_z_flag
+            ;     call    encode_arg1
+            ;     jmp     .switch_end
 
-            .xor_arg1_arg2:
+            ; .xor_arg1_arg2:
 
-                xor     r8b, r9b
-                call    set_z_flag
-                call    encode_arg1
-                jmp     .switch_end
+            ;     xor     r8b, r9b
+            ;     call    set_z_flag
+            ;     call    encode_arg1
+            ;     jmp     .switch_end
 
         .switch_arg_imm8:
 
-            xor     eax, eax
-            lea     r8, [rel spin_lock]
-            mov     [r8], eax
-
+    
             call    decode_arg1     ; stores it in r8b
             call    decode_imm8     ; stores it in r9b
 
@@ -479,8 +474,8 @@ so_emul:
             cmp     ax, 0x4000
             je      .movi_arg1_imm8
 
-            cmp     ax, 0x5800
-            je      .xori_arg1_imm8
+            ; cmp     ax, 0x5800
+            ; je      .xori_arg1_imm8
 
             cmp     ax, 0x6000
             je      .addi_arg1_imm8
@@ -491,11 +486,11 @@ so_emul:
             cmp     ax, 0x7000          ; RCRI also goes here
             je      .rcr_arg1_imm8
 
-            cmp     ax, 0x4800
-            je      .andi_arg1_imm8
+            ; cmp     ax, 0x4800
+            ; je      .andi_arg1_imm8
 
-            cmp     ax, 0x5000
-            je      .ori_arg1_arg2
+            ; cmp     ax, 0x5000
+            ; je      .ori_arg1_arg2
 
             .movi_arg1_imm8:
 
@@ -539,25 +534,21 @@ so_emul:
                 call    encode_arg1
                 jmp     .switch_end
 
-            .andi_arg1_imm8:
+            ; .andi_arg1_imm8:
 
-                and     r8b, r9b
-                call    set_z_flag
-                call    encode_arg1 
-                jmp     .switch_end
+            ;     and     r8b, r9b
+            ;     call    set_z_flag
+            ;     call    encode_arg1 
+            ;     jmp     .switch_end
 
-            .ori_arg1_arg2:
+            ; .ori_arg1_arg2:
 
-                or      r8b, r9b
-                call    set_z_flag
-                call    encode_arg1               
-                jmp     .switch_end
+            ;     or      r8b, r9b
+            ;     call    set_z_flag
+            ;     call    encode_arg1               
+            ;     jmp     .switch_end
 
         .switch_no_param:
-
-            xor     eax, eax
-            lea     r8, [rel spin_lock]
-            mov     [r8], eax
 
             cmp     word [r11], 0x8000
             je     .clc_no_param
@@ -588,10 +579,6 @@ so_emul:
 
         .switch_imm8:
 
-            xor     eax, eax
-            lea     r8, [rel spin_lock]
-            mov     [r8], eax
-
             call decode_imm8
 
             mov     ax, [r11] 
@@ -612,8 +599,8 @@ so_emul:
             cmp     ax, 0xC500
             je      .jz_imm8
 
-            cmp     ax, 0xC100
-            je      .djnz_imm8
+            ; cmp     ax, 0xC100
+            ; je      .djnz_imm8
 
             .jmp_imm8:
 
@@ -681,31 +668,44 @@ so_emul:
                 add     r11, rax
                 jmp     .switch_end
 
-            .djnz_imm8:
+            ; .djnz_imm8:
 
-                mov     al, [r12 + 8 * rcx + 1]
-                cmp     al, 0
-                je      .switch_end
+            ;     mov     al, [r12 + 8 * rcx + 1]
+            ;     cmp     al, 0
+            ;     je      .switch_end
 
-                sub     byte [r12 + 8 * rcx + 1], 1
-                xor     rax, rax
-                mov     al, r9b
-                add     [r12 + 8 * rcx + 4], al
-                movsx   rax, r9b
-                imul    rax, 2
-                add     r11, rax
-                jmp     .switch_end
+            ;     sub     byte [r12 + 8 * rcx + 1], 1
+            ;     xor     rax, rax
+            ;     mov     al, r9b
+            ;     add     [r12 + 8 * rcx + 4], al
+            ;     movsx   rax, r9b
+            ;     imul    rax, 2
+            ;     add     r11, rax
+            ;     jmp     .switch_end
 
         .switch_end:
 
         add     byte [r12 + 8 * rcx + 4], 1    ; increment total steps count
-        dec     rdx                     ; decrement steps to execute count
         add     r11, 2                  ; increment code pointer by two because it points to int16
+        mov     al, byte [r12 + 8 * rcx + 4]   ; check if overflow, and set to 0 if so
+        cmp     al, 0
+        jne     .do_not_set_PC_to_0
+        mov     r11, rdi
+        .do_not_set_PC_to_0:
+        dec     rdx                     ; decrement steps to execute count
+
+        xor     eax, eax
+        lea     r8, [rel spin_lock]
+        mov     [r8], eax
+
         jmp     .emul_step              ; jump to next step loop
 
     .steps_end:
 
-
+    xor     eax, eax
+        lea     r8, [rel spin_lock]
+        mov     [r8], eax
+        
     leave
     mov     rax, qword [r12 + 8 * rcx]  ; saves so cpu state 
     pop     r12
