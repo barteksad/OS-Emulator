@@ -8,7 +8,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/home/students/inf/b/bs429589/SO/zadanie2/OS-Emulator/testy-zad2/correctness_random.e",
+            "program": "/mnt/c/Users/HYPERBOOK/OneDrive/Pulpit/SO/zadanie2/src/testy-zad2/correctness_random.e",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

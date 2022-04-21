@@ -474,8 +474,8 @@ so_emul:
             cmp     ax, 0x4000
             je      .movi_arg1_imm8
 
-            ; cmp     ax, 0x5800
-            ; je      .xori_arg1_imm8
+            cmp     ax, 0x5800
+            je      .xori_arg1_imm8
 
             cmp     ax, 0x6000
             je      .addi_arg1_imm8
@@ -610,7 +610,7 @@ so_emul:
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
-                jmp     .switch_end
+                jmp     .set_code_ptr_after_jump
 
             .jnc_imm8:
                 
@@ -624,7 +624,7 @@ so_emul:
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
-                jmp     .switch_end
+                jmp     .set_code_ptr_after_jump
 
             .jc_imm8:
 
@@ -638,7 +638,7 @@ so_emul:
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
-                jmp     .switch_end
+                jmp     .set_code_ptr_after_jump
 
             .jnz_imm8:
 
@@ -652,7 +652,7 @@ so_emul:
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
-                jmp     .switch_end
+                jmp     .set_code_ptr_after_jump
 
             .jz_imm8:
 
@@ -666,6 +666,14 @@ so_emul:
                 movsx   rax, r9b
                 imul    rax, 2
                 add     r11, rax
+                jmp     .set_code_ptr_after_jump
+
+            .set_code_ptr_after_jump:
+
+                xor     r11, r11
+                add     r11b, byte [r12 + 8 * rcx + 4]
+                imul    r11w, 2
+                add     r11, rdi
                 jmp     .switch_end
 
             ; .djnz_imm8:
