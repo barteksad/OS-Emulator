@@ -265,7 +265,7 @@ so_emul:
 
     lea     r12, [rel REGS]
 
-
+    ; load poiter to current place in code to execute = rdi + PC x 2 bytes
     xor r11, r11
     add r11b, byte [r12 + 8 * rcx + 4]
     imul r11w, 2
@@ -336,6 +336,9 @@ so_emul:
 
             cmp     byte [r11], 0x0008
             je      .xchg_arg1_arg2
+
+            ; if we are here, it means that the instruction is invalid
+            jmp .switch_end
 
             .xchg_arg1_arg2:
 
@@ -592,17 +595,18 @@ so_emul:
 
         .switch_end:
 
+        ; release lock
         xor     eax, eax
         lea     r8, [rel spin_lock]
         mov     [r8], eax
 
         add     byte [r12 + 8 * rcx + 4], 1    ; increment total steps count
         add     r11, 2                         ; increment code pointer by two because it points to int16
-        mov     al, byte [r12 + 8 * rcx + 4]   ; check if overflow, and set to 0 if so
+        mov     al, byte [r12 + 8 * rcx + 4]   ; check if overflow, and set code pointer to beginnig
         cmp     al, 0
-        jne     .do_not_set_PC_to_0
+        jne     .do_not_set_code_ptr_to_beginning
         mov     r11, rdi
-        .do_not_set_PC_to_0:
+        .do_not_set_code_ptr_to_beginning:
         dec     rdx                            ; decrement steps to execute count
 
         jmp     .emul_step                     ; jump to next step loop
